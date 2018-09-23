@@ -6,6 +6,9 @@ AHealthPickup::AHealthPickup()
 {
 	//Initial value of the pickup
 	HealingCapacity = 50.f;
+
+	//Set the Pickup Name
+	PickupObjectName = TEXT("Health Kit");
 }
 
 void AHealthPickup::OnPickupCollection_Implementation()

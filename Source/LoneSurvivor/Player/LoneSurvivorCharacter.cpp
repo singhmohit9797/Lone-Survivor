@@ -10,6 +10,9 @@
 
 #include "LoneSurvivorPlayerController.h"
 #include "LoneSurvivorCharacterMovement.h"
+#include "../Pickups/PickupObject.h"
+#include "../Pickups/AmmoPickup.h"
+#include "../Pickups/HealthPickup.h"
 
 
 // Sets default values
@@ -34,8 +37,10 @@ ALoneSurvivorCharacter::ALoneSurvivorCharacter(const FObjectInitializer& ObjectI
 	PlayerMesh1P->bOwnerNoSee = false;
 	PlayerMesh1P->bCastDynamicShadow = false;
 	PlayerMesh1P->SetReceivesDecals(false);
-	//PlayerMesh1P->RelativeRotation = FRotator(1.9f, -19.19f, 5.2f);
+	PlayerMesh1P->RelativeRotation = FRotator(1.9f, -19.19f, 5.2f);
 	PlayerMesh1P->RelativeLocation = FVector(-0.5f, -4.4f, -155.7f);
+	PlayerMesh1P->SetGenerateOverlapEvents(true);
+	//PlayerMesh1P->SetCollisionProfileName("CP_LoneSurvivorCharacter");  -- Uncomment this line after creating the collision profile in the editor
 
 	GetMesh()->bOwnerNoSee = true;
 	GetMesh()->bOwnerNoSee = true;
@@ -156,7 +161,6 @@ void ALoneSurvivorCharacter::OnStartRunning()
 			SetTargeting(false);
 		}
 
-		//Change this to directly call stop weapon fire
 		OnStopFire();
 		bIsRunning = true;
 	}
@@ -173,6 +177,7 @@ void ALoneSurvivorCharacter::OnStartFire()
 	if (MyController && MyController->IsGameInputAllowed())
 	{
 		bIsFiring = true;
+		//StartWeaponFire();
 	}
 }
 
@@ -216,7 +221,7 @@ void ALoneSurvivorCharacter::ToggleCrouch()
 		}
 		else
 		{
-			//Add Support for sliding (Crouch while running)
+			//TODO: Add Support for sliding (Crouch while running)
 			const FString msg1 = "Crouched";
 			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Cyan, msg1, true, FVector2D::UnitVector * 1.5f);
 			bIsCrouched = true;
@@ -283,13 +288,55 @@ void ALoneSurvivorCharacter::TurnAtRate(const float Value)
 	AddControllerYawInput(BaseTurnRate * Value * GetWorld()->GetDeltaSeconds());
 }
 
-// Interact with the world
+//TODO: Modify this method to add the pickups to the inventory once the inventory is in place
 void ALoneSurvivorCharacter::Interact()
 {
 	ALoneSurvivorPlayerController *MyController = Cast<ALoneSurvivorPlayerController>(Controller);
 	if (MyController && MyController->IsGameInputAllowed())
 	{
+		//Collecto Pickups
+		TArray<AActor*> OverlappingActors;
+		GetOverlappingActors(OverlappingActors, APickupObject::StaticClass());
 
+		if (OverlappingActors.Num() > 0)
+		{
+			for (int32 index = 0; index < OverlappingActors.Num(); index++)
+			{
+				APickupObject* PickupObject = Cast<APickupObject>(OverlappingActors[index]);
+				if (PickupObject)
+				{
+					//Check if the pick is the ammo pickup
+					AAmmoPickup* AmmoPickup = Cast<AAmmoPickup>(PickupObject);
+					if (AmmoPickup)
+					{
+						//Add ammo to the weapon
+						EAmmoType::AmmoType AmmoType = AmmoPickup->GetAmmoType();
+						if (AmmoType == EAmmoType::Bullet)
+						{
+							//Add to the secondary weapon
+						}
+						else if (AmmoType == EAmmoType::Rifle)
+						{
+							//Add to the primary weapon
+						}
+					}
+					else
+					{
+						AHealthPickup* HealthPickup = Cast<AHealthPickup>(PickupObject);
+						if (HealthPickup)
+						{
+							//Add the health
+							CurrentHitPoints += HealthPickup->GetHealingCapacity();
+							if (CurrentHitPoints >= MaxHitPoints)
+								CurrentHitPoints = MaxHitPoints;
+						}
+					}
+
+					//Destroy the Pickup Object
+					PickupObject->OnPickupCollection_Implementation();
+				}
+			}
+		}
 	}
 }
 

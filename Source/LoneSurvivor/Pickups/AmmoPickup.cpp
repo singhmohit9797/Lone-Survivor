@@ -7,6 +7,12 @@ AAmmoPickup::AAmmoPickup()
 {
 	//Set the initial value for Ammo Capacity
 	AmmoCapacity = 60;
+
+	//Set the Pickup Name
+	PickupObjectName = TEXT("Ammo Box");
+
+	//Set the Ammo Type
+	AmmoType = EAmmoType::Rifle;
 }
 
 void AAmmoPickup::OnPickupCollection_Implementation()
