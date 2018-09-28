@@ -6,14 +6,12 @@
 #include "Pickups/PickupObject.h"
 #include "AmmoPickup.generated.h"
 
-namespace EAmmoType
+UENUM()
+enum class EAmmoType : uint8
 {
-	enum AmmoType
-	{
-		Bullet,
-		Rifle
-	};
-}
+	Handgun,
+	Rifle
+};
 
 /**
  * 
@@ -34,14 +32,14 @@ public:
 	FORCEINLINE int32 GetAmmoCapacity() const { return AmmoCapacity; }
 
 	/* Returns the ammo type in the pickup */
-	FORCEINLINE EAmmoType::AmmoType GetAmmoType() const{ return AmmoType; }
+	FORCEINLINE EAmmoType GetAmmoType() const{ return AmmoType; }
 
 protected:
 	/* Ammo available in the pickup */
-	UPROPERTY(EditAnywhere , BlueprintReadWrite, Category = "Attributes")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes")
 	int32 AmmoCapacity;
 
 	/* Type of the ammo in the pickup object */
-	UPROPERTY(EditAnywherem BlueprintReadWrite, Cateogory = "Attributes")
-	EAmmoType::AmmoType AmmoType;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes")
+	EAmmoType AmmoType;
 };

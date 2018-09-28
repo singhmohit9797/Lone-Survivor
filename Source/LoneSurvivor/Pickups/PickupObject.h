@@ -50,7 +50,7 @@ protected:
 	uint8 bIsActive : 1;
 
 	/* Name of the Pickup Object */
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Attributes", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes")
 	FName PickupObjectName;
 
 	/* Reference to the widget class that will show the object name when use draws near the object */
