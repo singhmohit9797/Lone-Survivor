@@ -3,9 +3,11 @@
 #include "LoneSurvivorWeapon.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "TimerManager.h"
 
 #include "../Player/LoneSurvivorCharacter.h"
 #include "../Player/LoneSurvivorPlayerController.h"
+#include "../Projectile/LoneSurvivorBullet.h"
 #include "../Pickups/PickupObject.h"
 
 // Sets default values
@@ -30,8 +32,10 @@ ALoneSurvivorWeapon::ALoneSurvivorWeapon()
 	bWantsToFire = false;
 	CurrentWeaponState = EWeaponState::Idle;
 	AmmoPerMag = 30;
-	InitialMags = 8;
+	InitialMags = 10;
 	MaxAmmo = 300;
+
+	AttachPointOnEquip = "WeaponAttachPoint";
 }
 
 // Called when the game starts or when spawned
@@ -78,22 +82,94 @@ bool ALoneSurvivorWeapon::CanReload() const
 	return bCanReload && bIsInValidStateToReload && bIsReloadNeeded;
 }
 
+void ALoneSurvivorWeapon::OnEquip()
+{
+	bIsBeingEquipped = true;
+	SetWeaponState(EWeaponState::Equipping);
+	
+	//Detach the weapon from the unequipped position
+	WeaponMesh->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
+
+	//Attach the weapon to the player
+	WeaponMesh->AttachToComponent(WeaponOwner->GetPlayerMesh(), FAttachmentTransformRules::KeepRelativeTransform, AttachPointOnEquip);
+
+	//Play the animation
+
+	//TODO: Dummy duration (Change to animation duration later)
+	float Duration = 100.f;
+
+	//Set the timer to call EquipFinished
+	GetWorldTimerManager().SetTimer(TimerHandle_EquipFinish, this, &ALoneSurvivorWeapon::OnEquipFinished, Duration, false);
+}
+
+void ALoneSurvivorWeapon::OnUnEquip()
+{
+	bIsEquipped = false;
+
+	//Detach from the Equip position
+	WeaponMesh->DetachFromComponent(FDetachmentTransformRules::KeepRelativeTransform);
+
+	//Attach to the un equipped position
+	WeaponMesh->AttachToComponent(WeaponOwner->GetPlayerMesh(), FAttachmentTransformRules::KeepRelativeTransform, AttachPointUnEquipped);
+
+	//TODO: Stop the Firing and the reload animations
+
+	//Clear all the timers for this weapon
+	GetWorldTimerManager().ClearAllTimersForObject(this);
+}
+
+void ALoneSurvivorWeapon::OnEquipFinished()
+{
+	bIsEquipped = true;
+	bIsBeingEquipped = false;
+
+	//Check the state of the weapon
+	if (bWantsToReload)
+	{
+		if (CanReload())
+		{
+			SetWeaponState(EWeaponState::Reloading);
+			StartReload();
+		}
+	}
+	else if (bWantsToFire && CanFire())
+	{
+		SetWeaponState(EWeaponState::Firing);
+	}
+	else
+	{
+		SetWeaponState(EWeaponState::Idle);
+	}
+}
+
 void ALoneSurvivorWeapon::StartFire()
 {
 	if (!bWantsToFire)
 	{
 		bWantsToFire = true;
 		
-		if (bWantsToReload)
+		if (bIsEquipped)
 		{
-			if (CanReload())
-				SetWeaponState(EWeaponState::Reloading);
-			else
-				SetWeaponState(CurrentWeaponState);
+			if (bWantsToReload)
+			{
+				if (CanReload())
+				{
+					SetWeaponState(EWeaponState::Reloading);
+					StartReload();
+				}
+				else
+				{
+					SetWeaponState(CurrentWeaponState);
+				}
+			}
+			else if (!bWantsToReload && CanFire())
+			{
+				SetWeaponState(EWeaponState::Firing);
+			}
 		}
-		else if (!bWantsToReload && CanFire())
+		else if(bIsBeingEquipped)
 		{
-			SetWeaponState(EWeaponState::Firing);
+			SetWeaponState(EWeaponState::Equipping);
 		}
 	}
 }
@@ -111,19 +187,29 @@ void ALoneSurvivorWeapon::StartReload()
 {
 	if (!bWantsToReload)
 	{
-		bWantsToReload = true;
-		if (CanReload())
+		if (bIsBeingEquipped)
 		{
-			SetWeaponState(EWeaponState::Reloading);
+			bWantsToReload = true;
+			if (CanReload())
+			{
+				SetWeaponState(EWeaponState::Reloading);
 
-			//Start Animation before the magazine is reloaded
+				//TODO: Start Animation before the magazine is reloaded
 
-			StartWeaponReload();
+				float Duration = 100.0f; //TODO: Dummy duration (Reset after adding the animation)
+
+				//Set the delegate to reload the weapon when the animation finishes
+				GetWorldTimerManager().SetTimer(TimerHandle_ReloadWeapon, this, &ALoneSurvivorWeapon::ReloadWeapon, Duration, false);
+			}
+			else
+			{
+				//TODO: Notify can't reload
+				SetWeaponState(CurrentWeaponState);
+			}
 		}
-		else
+		else if (bIsBeingEquipped)
 		{
-			//Notify can't reload
-			SetWeaponState(CurrentWeaponState);
+			SetWeaponState(EWeaponState::Equipping);
 		}
 	}
 }
@@ -138,7 +224,17 @@ void ALoneSurvivorWeapon::StopReload()
 			SetWeaponState(EWeaponState::Firing);
 		else
 			SetWeaponState(EWeaponState::Idle);
+
+		//TODO: Stop the animation
+
+		//Clear the timer so that queued reloading task is dequeued
+		GetWorldTimerManager().ClearTimer(TimerHandle_ReloadWeapon);
 	}
+}
+
+void ALoneSurvivorWeapon::AddAmmo(const int32 Amount)
+{
+	CurrentAmmo += Amount;
 }
 
 void ALoneSurvivorWeapon::SetWeaponOwner(class ALoneSurvivorCharacter* NewOwner)
@@ -207,10 +303,10 @@ void ALoneSurvivorWeapon::StartWeaponFire()
 
 void ALoneSurvivorWeapon::StopWeaponFire()
 {
-	//Stop the fire animations and sounds
+	//TODO: Stop the fire animations and sounds
 }
 
-void ALoneSurvivorWeapon::StartWeaponReload()
+void ALoneSurvivorWeapon::ReloadWeapon()
 {
 	//Check if the reload is even needed
 	if (CurrentMagAmmo < AmmoPerMag)

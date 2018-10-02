@@ -15,7 +15,8 @@ namespace EWeaponState
 	{
 		Idle,
 		Firing,
-		Reloading
+		Reloading,
+		Equipping
 	};
 }
 
@@ -51,8 +52,17 @@ public:
 	// Called when the player force stops the reload
 	void StopReload();
 
+	// Called when the player equips this weapon
+	void OnEquip();
+
+	// Called when the player unequips this weapon
+	void OnUnEquip();
+
 	// Sets the current owner of the weapon
 	void SetWeaponOwner(class ALoneSurvivorCharacter* NewOwner);
+
+	// Add ammo to the weapon
+	void AddAmmo(const int32 Amount);
 
 	//Get the ammo in the current mag
 	FORCEINLINE int32 GetCurrentMagAmmo() const { return CurrentMagAmmo; }
@@ -64,7 +74,7 @@ public:
 	FORCEINLINE int32 GetMaxAmmo() const { return MaxAmmo; }
 
 	// Get the current ammo the player has of this weapon
-	FORCEINLINE int32 GetCurrentAmmo() const { return CurrentAmmo + CurrentMagAmmo; }
+	FORCEINLINE int32 GetCurrentAmmo() const { return CurrentAmmo; }
 
 	// Get the current state of the weapon
 	FORCEINLINE EWeaponState::Weapon_State GetWeaponState() const { return CurrentWeaponState; }
@@ -72,7 +82,7 @@ public:
 	/* Get the Gun Mesh */
 	FORCEINLINE class USkeletalMeshComponent* GetGunMesh() const { return WeaponMesh; }
 
-protected:
+private:
 	// Starts firing the weapon
 	virtual void StartWeaponFire();
 
@@ -80,9 +90,11 @@ protected:
 	virtual void StopWeaponFire();
 
 	// Reloads the weapon
-	virtual void StartWeaponReload();
+	virtual void ReloadWeapon();
 
-private:
+	// When the equip is finished
+	virtual void OnEquipFinished();
+
 	// Whether the weapon can fire or not
 	bool CanFire() const;
 
@@ -99,6 +111,54 @@ protected:
 	UPROPERTY(Transient)
 	class ALoneSurvivorCharacter* WeaponOwner;
 
+	// Ammo per each magazine
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Config", META = (AllowPrivateAccess = "true", ClampMin = "0", UIMin = "0"))
+	int32 AmmoPerMag;
+
+	// Magazines at the start of the game
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Config", META = (AllowPrivateAccess = "true", ClampMin = "0", UIMin = "0"))
+	int32 InitialMags;
+
+	// Max ammo that the player can have for the weapon
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Config", META = (AllowPrivateAccess = "true", ClampMin = "0", UIMin = "0"))
+	int32 MaxAmmo;
+
+	// Range of the weapon
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes|Firing")
+	float WeaponRange;
+
+	/* Bullet spread when the player is firing while standing */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes|Firing")
+	float SpreadRadius;
+
+	/* Bullet Spread when the player is firing while targeting */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes|Firing")
+	float TargetingSpreadRadius;
+
+	/* Bullet Spread when the player is firing while targeting */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes|Firing")
+	float RunningSpreadRadius;
+
+	/* Bullet Spread when the player is firing from the hip (Crouch position) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes|Firing")
+	float CrouchSpreadRadius;
+
+	/* Bullet Spread when the player is firing while prone */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attributes|Firing")
+	float ProneSpreadRadius;
+
+	// Attach Point on the Player's Mesh when the weapon is equipped
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh")
+	FName AttachPointOnEquip;
+
+	// Attach Point on the Player's mesh when the weapon is un equipped (To be set in the subclasses)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh")
+	FName AttachPointUnEquipped;
+
+	/* Type of Bullet fired by the weapon */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Projectile")
+	TSubclassOf<class ALoneSurvivorBullet>* BulletType;
+	
 private:
 	// Current ammo in the magazine
 	int32 CurrentMagAmmo;
@@ -109,23 +169,23 @@ private:
 	// Current state of the weapon
 	EWeaponState::Weapon_State CurrentWeaponState;
 
+	// Whether this weapon is equipped or not
+	uint8 bIsEquipped : 1;
+
+	// If the this weapon is being equipped or not
+	uint8 bIsBeingEquipped : 1;
+
 	// Whether the player wants to reload
 	uint8 bWantsToReload : 1;
 
 	// Whether the player wants to fire
 	uint8 bWantsToFire : 1;
 
-	// Ammo per each magazine
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Config", META = (AllowPrivateAccess = "true", ClampMin = "0", UIMin = "0"))
-	int32 AmmoPerMag;
-	
-	// Magazines at the start of the game
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Config", META = (AllowPrivateAccess = "true", ClampMin = "0", UIMin = "0"))
-	int32 InitialMags;
+	//To Handle the Equip Finish Timer
+	FTimerHandle TimerHandle_EquipFinish;
 
-	// Max ammo that the player can have for the weapon
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Weapon Config", META = (AllowPrivateAccess = "true", ClampMin = "0", UIMin = "0"))
-	int32 MaxAmmo;
+	//To handle the ReloadWeapon Timer
+	FTimerHandle TimerHandle_ReloadWeapon;
 
 	/* Skeletal Mesh Component representing the gun in the game */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh", META = (AllowPrivateAccess = "true"))
@@ -136,6 +196,6 @@ private:
 	class USceneComponent* MuzzleLocation;
 
 	/* Offset of the Muzzle location */
-	UPROPERTY(VisibleAnyWhere, BlueprintReadOnly, Category = "Muzzle", META = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Muzzle", META = (AllowPrivateAccess = "true"))
 	FVector MuzzleOffset;
 };

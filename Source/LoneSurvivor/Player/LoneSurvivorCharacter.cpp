@@ -13,6 +13,7 @@
 #include "../Pickups/PickupObject.h"
 #include "../Pickups/AmmoPickup.h"
 #include "../Pickups/HealthPickup.h"
+#include "../Weapons/LoneSurvivorWeapon.h"
 
 
 // Sets default values
@@ -75,6 +76,11 @@ void ALoneSurvivorCharacter::PostInitializeComponents()
 	//Set the intial variables
 	CurrentHitPoints = MaxHitPoints;
 	CurrentStance = EPlayerStance::Standing;
+
+	//TODO: Spawn Weapons
+
+
+	EquipPrimaryWeapon();
 }
 
 //Destroy the character object
@@ -110,18 +116,23 @@ void ALoneSurvivorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	PlayerInputComponent->BindAction("Run", IE_Pressed, this, &ALoneSurvivorCharacter::OnStartRunning);
 	PlayerInputComponent->BindAction("Run", IE_Released, this, &ALoneSurvivorCharacter::OnStopRunning);
 
-	PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &ALoneSurvivorCharacter::ToggleCrouch);
-	PlayerInputComponent->BindAction("Prone", IE_Pressed, this, &ALoneSurvivorCharacter::ToggleProne);
-
 	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &ALoneSurvivorCharacter::OnStartFire);
 	PlayerInputComponent->BindAction("Fire", IE_Released, this, &ALoneSurvivorCharacter::OnStopFire);
 
 	PlayerInputComponent->BindAction("Target", IE_Pressed, this, &ALoneSurvivorCharacter::OnStartTargeting);
 	PlayerInputComponent->BindAction("Target", IE_Released, this, &ALoneSurvivorCharacter::OnStopTargeting);
 
+	PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &ALoneSurvivorCharacter::ToggleCrouch);
+	
+	PlayerInputComponent->BindAction("Prone", IE_Pressed, this, &ALoneSurvivorCharacter::ToggleProne);
+
 	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &ALoneSurvivorCharacter::Interact);
 
 	PlayerInputComponent->BindAction("Reload", IE_Pressed, this, &ALoneSurvivorCharacter::OnReload);
+
+	PlayerInputComponent->BindAction("EquipRifle", IE_Pressed, this, &ALoneSurvivorCharacter::EquipPrimaryWeapon);
+
+	PlayerInputComponent->BindAction("EquipHandgun", IE_Pressed, this, &ALoneSurvivorCharacter::EquipSecondaryWeapon);
 
 	/******************** Axis Bindings *********************/
 	PlayerInputComponent->BindAxis("MoveForward", this, &ALoneSurvivorCharacter::MoveForward);
@@ -136,7 +147,7 @@ void ALoneSurvivorCharacter::SetupPlayerInputComponent(UInputComponent* PlayerIn
 void ALoneSurvivorCharacter::OnJumpStart()
 {
 	ALoneSurvivorPlayerController* MyController = Cast<ALoneSurvivorPlayerController>(Controller);
-	if (MyController && MyController->IsGameInputAllowed())
+	if (MyController && MyController->IsPlayerInputAllowed())
 	{
 		bPressedJump = true;
 	}
@@ -145,7 +156,7 @@ void ALoneSurvivorCharacter::OnJumpStart()
 void ALoneSurvivorCharacter::OnJumpStop()
 {
 	ALoneSurvivorPlayerController* MyController = Cast<ALoneSurvivorPlayerController>(Controller);
-	if (MyController && MyController->IsGameInputAllowed())
+	if (MyController && MyController->IsPlayerInputAllowed())
 	{
 		bPressedJump = false;
 	}
@@ -154,14 +165,19 @@ void ALoneSurvivorCharacter::OnJumpStop()
 void ALoneSurvivorCharacter::OnStartRunning()
 {
 	ALoneSurvivorPlayerController* MyController = Cast<ALoneSurvivorPlayerController>(Controller);
-	if (MyController && MyController->IsGameInputAllowed())
+	if (MyController && MyController->IsPlayerInputAllowed())
 	{
 		if (IsTargeting())
 		{
 			SetTargeting(false);
 		}
 
+		//Stop the firing
 		OnStopFire();
+
+		//Stop the weapon reload
+		OnStopReload();
+
 		bIsRunning = true;
 	}
 }
@@ -174,23 +190,23 @@ void ALoneSurvivorCharacter::OnStopRunning()
 void ALoneSurvivorCharacter::OnStartFire()
 {
 	ALoneSurvivorPlayerController *MyController = Cast<ALoneSurvivorPlayerController>(Controller);
-	if (MyController && MyController->IsGameInputAllowed())
+	if (MyController && MyController->IsPlayerInputAllowed())
 	{
 		bIsFiring = true;
-		//StartWeaponFire();
+		CurrentWeapon->StartFire();
 	}
 }
 
 void ALoneSurvivorCharacter::OnStopFire()
 {
 	bIsFiring = false;
-	//StopWeaponFire();
+	CurrentWeapon->StopFire();
 }
 
 void ALoneSurvivorCharacter::OnStartTargeting()
 {
 	ALoneSurvivorPlayerController* MyController = Cast<ALoneSurvivorPlayerController>(Controller);
-	if (MyController && MyController->IsGameInputAllowed())
+	if (MyController && MyController->IsPlayerInputAllowed())
 	{
 		if (IsRunning())
 		{
@@ -198,7 +214,6 @@ void ALoneSurvivorCharacter::OnStartTargeting()
 		}
 		SetTargeting(true);
 	}
-
 }
 
 void ALoneSurvivorCharacter::OnStopTargeting()
@@ -209,58 +224,41 @@ void ALoneSurvivorCharacter::OnStopTargeting()
 void ALoneSurvivorCharacter::ToggleCrouch()
 {
 	ALoneSurvivorPlayerController* MyController = Cast<ALoneSurvivorPlayerController>(Controller);
-	if (MyController && MyController->IsGameInputAllowed())
-	{
-		
+	if (MyController && MyController->IsPlayerInputAllowed())
+	{	
 		if (bIsCrouched)
 		{
-			const FString msg1 = "Stood";
-			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Cyan, msg1, true, FVector2D::UnitVector * 1.5f);
 			bIsCrouched = false;
 			SetStance(EPlayerStance::Standing);
 		}
 		else
 		{
 			//TODO: Add Support for sliding (Crouch while running)
-			const FString msg1 = "Crouched";
-			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Cyan, msg1, true, FVector2D::UnitVector * 1.5f);
 			bIsCrouched = true;
 			SetStance(EPlayerStance::Crouch);
 		}
-		/*FVector RootComponentLocation = RootComponent->GetComponentLocation();
-		if (bIsCrouched)
-		{
-			SetStance(EPlayerStance::Standing);
-			RootComponentLocation -= FVector(0, CrouchedEyeHeight, 0);
-		}
-		else
-		{
-			SetStance(EPlayerStance::Crouch);
-		}
-		RootComponent->SetRelativeLocation(RootComponentLocation);*/
 	}
 }
 
 void ALoneSurvivorCharacter::ToggleProne()
 {
 	ALoneSurvivorPlayerController* MyController = Cast<ALoneSurvivorPlayerController>(Controller);
-	if (MyController && MyController->IsGameInputAllowed())
+	if (MyController && MyController->IsPlayerInputAllowed())
 	{
 		if (bIsProne)
 		{
 			bIsProne = false;
-			CurrentStance = EPlayerStance::Standing;
+			SetStance(EPlayerStance::Standing);
 		}
 		else
 		{
 			//Add logic to change the eye height
 			bIsProne = true;
-			CurrentStance = EPlayerStance::Prone;
+			SetStance(EPlayerStance::Prone);
 		}
 	}
 }
 
-// Move forward or backward
 void ALoneSurvivorCharacter::MoveForward(const float Value)
 {
 	if (Controller && Value != 0.f)
@@ -271,10 +269,9 @@ void ALoneSurvivorCharacter::MoveForward(const float Value)
 	}
 }
 
-// Move Left or Right
 void ALoneSurvivorCharacter::MoveRight(const float Value)
 {
-	if (Value != 0.f)
+	if (Controller && Value != 0.f)
 	{
 		FQuat rotation = GetActorQuat();
 		FVector direction = FQuatRotationMatrix(rotation).GetUnitAxis(EAxis::Y);
@@ -282,59 +279,70 @@ void ALoneSurvivorCharacter::MoveRight(const float Value)
 	}
 }
 
-// Turn the camera
 void ALoneSurvivorCharacter::TurnAtRate(const float Value)
 {
 	AddControllerYawInput(BaseTurnRate * Value * GetWorld()->GetDeltaSeconds());
 }
 
-//TODO: Modify this method to add the pickups to the inventory once the inventory is in place
 void ALoneSurvivorCharacter::Interact()
 {
 	ALoneSurvivorPlayerController *MyController = Cast<ALoneSurvivorPlayerController>(Controller);
-	if (MyController && MyController->IsGameInputAllowed())
+	if (MyController && MyController->IsPlayerInputAllowed())
 	{
-		//Collecto Pickups
-		TArray<AActor*> OverlappingActors;
-		GetOverlappingActors(OverlappingActors, APickupObject::StaticClass());
+		//Collect Pickups
+		CollectPickups();
 
-		if (OverlappingActors.Num() > 0)
+		// Add other things later - Other game objects
+	}
+}
+
+//TODO: Modify this method to add the pickups to the inventory once the inventory is in place
+void ALoneSurvivorCharacter::CollectPickups()
+{
+	TArray<AActor*> OverlappingActors;
+	GetOverlappingActors(OverlappingActors, APickupObject::StaticClass());
+
+	if (OverlappingActors.Num() > 0)
+	{
+		for (int32 index = 0; index < OverlappingActors.Num(); index++)
 		{
-			for (int32 index = 0; index < OverlappingActors.Num(); index++)
+			APickupObject* PickupObject = Cast<APickupObject>(OverlappingActors[index]);
+			if (PickupObject)
 			{
-				APickupObject* PickupObject = Cast<APickupObject>(OverlappingActors[index]);
-				if (PickupObject)
+				//Check if the pick is the ammo pickup
+				AAmmoPickup* AmmoPickup = Cast<AAmmoPickup>(PickupObject);
+				if (AmmoPickup)
 				{
-					//Check if the pick is the ammo pickup
-					AAmmoPickup* AmmoPickup = Cast<AAmmoPickup>(PickupObject);
-					if (AmmoPickup)
+					//Add ammo to the weapon if the ammo is needed
+					EAmmoType AmmoType = AmmoPickup->GetAmmoType();
+					if (AmmoType == EAmmoType::Handgun && SecondaryWeapon->GetCurrentAmmo() < SecondaryWeapon->GetMaxAmmo())
 					{
-						//Add ammo to the weapon
-						EAmmoType::AmmoType AmmoType = AmmoPickup->GetAmmoType();
-						if (AmmoType == EAmmoType::Bullet)
-						{
-							//Add to the secondary weapon
-						}
-						else if (AmmoType == EAmmoType::Rifle)
-						{
-							//Add to the primary weapon
-						}
+						//Add to the secondary weapon
+						SecondaryWeapon->AddAmmo(AmmoPickup->GetAmmoCapacity());
 					}
-					else
+					else if (AmmoType == EAmmoType::Rifle && PrimaryWeapon->GetCurrentAmmo() < PrimaryWeapon->GetMaxAmmo())
 					{
-						AHealthPickup* HealthPickup = Cast<AHealthPickup>(PickupObject);
-						if (HealthPickup)
+						//Add to the primary weapon
+						PrimaryWeapon->AddAmmo(AmmoPickup->GetAmmoCapacity());
+					}
+				}
+				else
+				{
+					AHealthPickup* HealthPickup = Cast<AHealthPickup>(PickupObject);
+					if (HealthPickup)
+					{
+						//Add the health
+						if (CurrentHitPoints < MaxHitPoints)
 						{
-							//Add the health
 							CurrentHitPoints += HealthPickup->GetHealingCapacity();
 							if (CurrentHitPoints >= MaxHitPoints)
 								CurrentHitPoints = MaxHitPoints;
 						}
 					}
-
-					//Destroy the Pickup Object
-					PickupObject->OnPickupCollection_Implementation();
 				}
+
+				//Destroy the Pickup Object
+				PickupObject->OnPickupCollection_Implementation();
 			}
 		}
 	}
@@ -344,40 +352,63 @@ void ALoneSurvivorCharacter::Interact()
 void ALoneSurvivorCharacter::OnReload()
 {
 	ALoneSurvivorPlayerController *MyController = Cast<ALoneSurvivorPlayerController>(Controller);
-	if (MyController && MyController->IsGameInputAllowed())
+	if (MyController && MyController->IsPlayerInputAllowed())
 	{
-
+		if (CurrentWeapon)
+		{
+			CurrentWeapon->StartReload();
+		}
 	}
 }
 
-//Set new Targeting state
-void ALoneSurvivorCharacter::SetTargeting(bool bNewTargeting)
+void ALoneSurvivorCharacter::OnStopReload()
 {
-	bIsTargeting = bNewTargeting;
+	if (CurrentWeapon)
+	{
+		CurrentWeapon->StopReload();
+	}
 }
 
-// Set new Running state
-void ALoneSurvivorCharacter::SetRunning(bool bNewRunning)
+void ALoneSurvivorCharacter::EquipPrimaryWeapon()
 {
-	bIsRunning = bNewRunning;
+	ALoneSurvivorPlayerController* MyController = Cast<ALoneSurvivorPlayerController>(Controller);
+	if (MyController)
+	{
+		if (CurrentWeapon != PrimaryWeapon && PrimaryWeapon != nullptr)
+		{
+			if (CurrentWeapon)
+				CurrentWeapon->OnUnEquip();
+
+			CurrentWeapon = PrimaryWeapon;
+
+			CurrentWeapon->SetWeaponOwner(this);
+			CurrentWeapon->OnEquip();
+		}
+	}
 }
 
-//Set new Firing state
-void ALoneSurvivorCharacter::SetFiring(bool bNewFiring)
+void ALoneSurvivorCharacter::EquipSecondaryWeapon()
 {
-	bIsFiring = bNewFiring;
-}
+	ALoneSurvivorPlayerController* MyController = Cast<ALoneSurvivorPlayerController>(Controller);
+	if (MyController)
+	{
+		if (CurrentWeapon != SecondaryWeapon)
+		{
+			if (CurrentWeapon)
+				CurrentWeapon->OnUnEquip();
 
-//Set new Stance
-void ALoneSurvivorCharacter::SetStance(EPlayerStance::Stance bNewStance)
-{
-	CurrentStance = bNewStance;
+			CurrentWeapon = SecondaryWeapon;
+
+			CurrentWeapon->SetWeaponOwner(this);
+			CurrentWeapon->OnEquip();
+		}
+	}
 }
 
 bool ALoneSurvivorCharacter::CanReload() const
 {
 	ALoneSurvivorPlayerController* MyController = Cast<ALoneSurvivorPlayerController>(Controller);
-	if (MyController && MyController->IsGameInputAllowed())
+	if (MyController && MyController->IsPlayerInputAllowed())
 	{
 		return IsAlive();
 	}
@@ -388,7 +419,7 @@ bool ALoneSurvivorCharacter::CanReload() const
 bool ALoneSurvivorCharacter::CanFire() const
 {
 	ALoneSurvivorPlayerController* MyController = Cast<ALoneSurvivorPlayerController>(Controller);
-	if (MyController && MyController->IsGameInputAllowed())
+	if (MyController && MyController->IsPlayerInputAllowed())
 	{
 		return IsAlive();
 	}

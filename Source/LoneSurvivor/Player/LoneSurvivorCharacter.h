@@ -6,15 +6,13 @@
 #include "GameFramework/Character.h"
 #include "LoneSurvivorCharacter.generated.h"
 
-namespace EPlayerStance
+UENUM()
+enum class EPlayerStance
 {
-	enum Stance
-	{
-		Standing,
-		Crouch,
-		Prone,
-	};
-}
+	Standing,
+	Crouch,
+	Prone,
+};
 
 UCLASS()
 class LONESURVIVOR_API ALoneSurvivorCharacter : public ACharacter
@@ -28,6 +26,7 @@ public:
 	/** spawn inventory, setup initial variables */
 	virtual void PostInitializeComponents() override;
 
+	/* Destroy the player character */
 	virtual void Destroyed() override;
 
 	// Called every frame
@@ -36,51 +35,56 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	/* Return whether the player is alive or not */
-	FORCEINLINE bool IsAlive() const { return CurrentHitPoints > 0; }
-
-	/* Get the player mesh */
-	FORCEINLINE USkeletalMeshComponent* GetPlayerMesh() const { return PlayerMesh1P; }
-
-	/* If the player can reload or not */
+	/* Returns If the player can reload or not */
 	bool CanReload() const;
 
-	/* If the player can fire or not */
+	/* Returns If the player can fire or not */
 	bool CanFire() const;
 
-	/* Get if the player is targeting */
+	/* Returns the current health of the player */
+	FORCEINLINE float GetCurrentHealth() const { return CurrentHitPoints; }
+
+	/* Returns the maximum health of the player */
+	FORCEINLINE float GetMaxHealth() const { return MaxHitPoints; }
+
+	/* Returns whether the player is alive or not */
+	FORCEINLINE bool IsAlive() const { return CurrentHitPoints > 0; }
+
+	/* Returns the player mesh */
+	FORCEINLINE USkeletalMeshComponent* GetPlayerMesh() const { return PlayerMesh1P; }
+
+	/* Returns the weapon currently equipped by the player */
+	FORCEINLINE class ALoneSurvivorWeapon* GetCurrentWeapon() const { return CurrentWeapon; }
+
+	/* Returns if the player is targeting */
 	UFUNCTION(BlueprintCallable, Category = "Game|Weapon")
 	bool IsTargeting() const { return bIsTargeting; }
 
-	/* Get if the Player if firing */
+	/* Returns if the Player if firing */
 	UFUNCTION(BlueprintCallable, Category = "Game|Weapon")
 	bool IsFiring() const { return bIsFiring; }
 
-	/* Get if the player is running */
+	/* Returns if the player is running */
 	UFUNCTION(BlueprintCallable, Category = "Game|Movement")
 	bool IsRunning() const { return bIsRunning; }
 
-	/* Get if the player is in crouch stance */
+	/* Returns the current stance of the player */
 	UFUNCTION(BlueprintCallable, Category = "Game|Movement")
-	bool IsCouched() const { return bIsCrouched; }
+	EPlayerStance GetCurrentStance() const { return CurrentStance; }
 
-	/* Get if the player is prone stance */
-	UFUNCTION(BlueprintCallable, Category = "Game|Movement")
-	bool IsProne() const { return bIsProne; }
-
-	/* Get Targeting speed modifier */
+	/* Returns Targeting speed modifier */
 	UFUNCTION(BlueprintCallable, Category = "Game|Movement")
 	float GetTargetingSpeedModifier() const { return TargetingSpeedModifier; }
 
-	/* Get Running speed modifier */
+	/* Returns Running speed modifier */
 	UFUNCTION(BlueprintCallable, Category = "Game|Movement")
 	float GetRunningSpeedModifier() const { return RunningSpeedModifier; }
 
-	/* Get Crouch speed modifier */
+	/* Returns Crouch speed modifier */
 	UFUNCTION(BlueprintCallable, Category = "Game|Movement")
 	float GetCrouchSpeedModifier() const { return CrouchSpeedModifier; }
 
-	/* Get Prone speed modifier */
+	/* Returns Prone speed modifier */
 	UFUNCTION(BlueprintCallable, Category = "Game|Movement")
 	float GetProneSpeedModifier() const { return ProneSpeedModifier; }
 
@@ -139,20 +143,32 @@ private:
 	/* Triggered when player presses Interact Action Button */
 	void Interact();
 
+	/* Responsible for collecting the pickups overlapping with the player */
+	void CollectPickups();
+
 	/* Triggered when player presses Reload Action Button */
 	void OnReload();
 
+	/* Called to stop the reload when the action is interuppted */
+	void OnStopReload();
+
+	/* Triggered when player equips the rifle */
+	void EquipPrimaryWeapon();
+
+	/* Triggered when player equips the pistol */
+	void EquipSecondaryWeapon();
+
 	/* Set new Targeting state */
-	void SetTargeting(bool bNewTargeting);
+	inline void SetTargeting(bool bNewTargeting) { bIsTargeting = bNewTargeting; }
 
 	/* Set new running state */
-	void SetRunning(bool bNewRunning);
+	inline void SetRunning(bool bNewRunning) { bIsRunning = bNewRunning; }
 
 	/* Set new firing state */
-	void SetFiring(bool bNewFiring);
+	inline void SetFiring(bool bNewFiring) { bIsFiring = bNewFiring; }
 
 	/* Set new Stance */
-	void SetStance(EPlayerStance::Stance bNewStance);
+	inline void SetStance(EPlayerStance NewStance) { CurrentStance = NewStance; }
 
 public:
 
@@ -194,10 +210,7 @@ private:
 	/* Whether player is running */
 	uint8 bIsRunning : 1;
 
-	/* Current Posture of the player i.e. whether the player is in Standing Position, Crouch Position or Prone Position */
-	EPlayerStance::Stance CurrentStance;
-
-	/* WHether the player is firing */
+	/* Whether the player is firing */
 	uint8 bIsFiring : 1;
 
 	/* Whether player is aiming down the sight */
@@ -209,8 +222,20 @@ private:
 	/* Whether the player is in crouch stance */
 	uint8 bIsCrouched : 1;
 
+	/* Current Stance of the player i.e. whether the player is in Standing Position, Crouch Position or Prone Position */
+	EPlayerStance CurrentStance;
+
 	/* Current Health of the player */
 	float CurrentHitPoints;
+
+	// Primary weapon of the player (Rifle)
+	class ALoneSurvivorWeapon* PrimaryWeapon;
+
+	// Secondary weapon of the player (Pistol)
+	class ALoneSurvivorWeapon* SecondaryWeapon;
+
+	// Current weapon equipped by the player
+	class ALoneSurvivorWeapon* CurrentWeapon;
 
 	/* Default eye height in Prone stance */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera", META = (AllowPrivateAccess = "true"))

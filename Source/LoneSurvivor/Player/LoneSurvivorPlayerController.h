@@ -23,7 +23,7 @@ public:
 
 	/* Are the player inputs allowed */
 	UFUNCTION(BlueprintCallable, Category = "Gameplay")
-	bool IsGameInputAllowed() const { return bAllowPlayerActions; }
+	bool IsPlayerInputAllowed() const { return bAllowPlayerActions; }
 
 	/* Is the game paused */
 	UFUNCTION(BlueprintCallable, Category = "Gameplay")
