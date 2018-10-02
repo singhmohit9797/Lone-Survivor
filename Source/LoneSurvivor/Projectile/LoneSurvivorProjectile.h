@@ -37,6 +37,7 @@ public:
 
 protected:
 	/* Damage dealt by the projectile on collision */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Damage")
 	float OnHitDamage;
 
 private:

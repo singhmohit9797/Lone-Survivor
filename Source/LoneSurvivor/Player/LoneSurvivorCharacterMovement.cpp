@@ -16,30 +16,27 @@ float ULoneSurvivorCharacterMovement::GetMaxSpeed() const
 	ALoneSurvivorCharacter *Player = Cast<ALoneSurvivorCharacter>(PawnOwner);
 	if (Player)
 	{
+		//Reduce the speed when the player is hurt
+		const float CurrentToMaxHealthRatio = Player->GetCurrentHealth() / Player->GetMaxHealth();
+
 		if (Player->IsProne())
 		{
 			MaxSpeed *= Player->GetProneSpeedModifier();
-			const FString msg1 = "Prone Max Speed " + FString::SanitizeFloat(MaxSpeed);
-			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Cyan, msg1, true, FVector2D::UnitVector * 1.5f);
 		}
 		else if (Player->IsCouched())
 		{
 			MaxSpeed *= Player->GetCrouchSpeedModifier();
-			const FString msg1 = "Crouched Max Speed " + FString::SanitizeFloat(MaxSpeed);
-			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Cyan, msg1, true, FVector2D::UnitVector * 1.5f);
 		}
 		else if (Player->IsTargeting())
 		{
 			MaxSpeed *= Player->GetTargetingSpeedModifier();
-			const FString msg1 = "Targetting Max Speed " + FString::SanitizeFloat(MaxSpeed);
-			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Cyan, msg1, true, FVector2D::UnitVector * 1.5f);
 		}
 		else if (Player->IsRunning())
 		{
 			MaxSpeed *= Player->GetRunningSpeedModifier();
-			const FString msg1 = "Running Max Speed " + FString::SanitizeFloat(MaxSpeed);
-			GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Cyan, msg1, true, FVector2D::UnitVector * 1.5f);
 		}
+
+		MaxSpeed *= CurrentToMaxHealthRatio;
 	}
 
 	return MaxSpeed;

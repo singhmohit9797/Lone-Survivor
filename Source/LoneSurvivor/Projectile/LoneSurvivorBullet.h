@@ -6,6 +6,13 @@
 #include "Projectile/LoneSurvivorProjectile.h"
 #include "LoneSurvivorBullet.generated.h"
 
+UENUM()
+enum class EBulletType : uint8
+{
+	Rifle45mm,
+	HandgunBullet9mm
+};
+
 /**
  * 
  */
@@ -18,6 +25,9 @@ public:
 	ALoneSurvivorBullet();
 	
 protected:
+	/* Bullet Type represented by this class */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Type")
+	EBulletType BulletType;
 
 private:
 	/* Delegate to handle the hit event of the projectile */
